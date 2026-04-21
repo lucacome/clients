@@ -81,16 +81,19 @@ export class IntegrationContext<Settings extends object> {
    *  @param request supplies information about the state of the extension site
    *  @param options optional parameters
    *  @param options.extractHostname when `true`, tries to extract the hostname from the website URL, returns full URL otherwise
+   *  @param options.extractOrigin when `true`, tries to extract the origin (scheme + host) from the website URL, returns full URL otherwise
    *  @param options.maxLength limits the length of the return value
    *  @returns The website or an empty string if a website isn't available
    *  @remarks `website` is usually supplied when generating a credential from the vault
    */
   website(
     request: IntegrationRequest,
-    options?: { extractHostname?: boolean; maxLength?: number },
+    options?: { extractHostname?: boolean; extractOrigin?: boolean; maxLength?: number },
   ) {
     let url = request.website ?? "";
-    if (options?.extractHostname) {
+    if (options?.extractOrigin) {
+      url = Utils.getUrl(url)?.origin ?? url;
+    } else if (options?.extractHostname) {
       url = Utils.getHost(url) ?? url;
     }
     return url.slice(0, options?.maxLength);
@@ -116,30 +119,13 @@ export class IntegrationContext<Settings extends object> {
     return description.slice(0, options?.maxLength);
   }
 
-  /** look up the website the integration is working with and extract the domain name.
-   * for example, "https://example.com/path" becomes "https://example.com"
-   * @param request supplies information about the state of the extension site
-   * @returns the domain name or an empty string if a website isn't available
-   * */
-  domain(request: IntegrationRequest) {
-    const website = this.website(request);
-    if (website === "") {
-      return "";
-    }
-
-    // extract the domain name from the website
-    const url = new URL(website);
-    return url.host;
-  }
-
   /** transform a domain into a valid prefifx
    * for example, "example.com" becomes "example", "foo.example.com" becomes "foo_example"
    * @param request supplies information about the state of the extension site
-   * @returns prefix for the forwarding address
+   * @returns prefix derived from the website URL or an empty string if a website isn't available
    * */
   prefix(request: IntegrationRequest) {
-    const url = new URL(this.domain(request));
-    const hostname = url.hostname;
+    const hostname = Utils.getHostname(this.website(request)) ?? "";
     if (hostname === "") {
       return "";
     }
